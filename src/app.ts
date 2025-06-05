@@ -293,4 +293,77 @@ const firebaseConfig = {
 const firebase = initializeApp(firebaseConfig);
 const db = getFirestore(firebase);
 
+app.get('/group/fetch/:group', async (req, res) => {
+  const groupName = req.params.group;
+  
+  try {
+    const docRef = doc(db, 'groups', groupName);
+    const groupDoc = await getDoc(docRef);
+    
+    if (!groupDoc.data()) {
+      return res.status(404).json({
+        error: 'Group not found',
+        groupName: groupName
+      });
+    }
+    
+    const groupData = groupDoc.data();
+    const members = groupData?.members;
+    
+    if (!members || !Array.isArray(members)) {
+      return res.status(400).json({
+        error: 'No members found in group or invalid members format',
+        groupName: groupName
+      });
+    }
+    const userPromises = members.map(async (username: string) => {
+      try {
+        const userData = await queryLeetCodeAPI(getUserProfileQuery, { username });
+        
+        if (userData.errors) {
+          return {
+            username: username,
+            questionsSolved: null,
+            error: 'User not found'
+          };
+        }
+        
+        const questionsSolved = userData.data.matchedUser.submitStats.acSubmissionNum[0].count;
+        
+        return {
+          username: username,
+          questionsSolved: questionsSolved
+        };
+      } catch (error) {
+        return {
+          username: username,
+          questionsSolved: null,
+          error: 'Failed to fetch user data'
+        };
+      }
+    });
+    
+    const usersData = await Promise.all(userPromises);
+    
+    const sortedUsers = usersData.sort((a, b) => {
+      if (a.questionsSolved === null) return 1;
+      if (b.questionsSolved === null) return -1;
+      return b.questionsSolved - a.questionsSolved;
+    });
+    
+    return res.json({
+      groupName: groupName,
+      totalMembers: members.length,
+      members: sortedUsers
+    });
+    
+  } catch (error) {
+    console.error('Error fetching group data:', error);
+    return res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+});
+
 export default app;
