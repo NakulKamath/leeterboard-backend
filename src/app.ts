@@ -262,14 +262,14 @@ app.use(
 );
 
 //get user profile details
-app.get('/:username', leetcode.userData);
-app.get('/:username/badges', leetcode.userBadges);
-app.get('/:username/solved', leetcode.solvedProblem);
-app.get('/:username/contest', leetcode.userContest);
-app.get('/:username/contest/history', leetcode.userContestHistory);
-app.get('/:username/submission', leetcode.submission);
-app.get('/:username/acSubmission', leetcode.acSubmission);
-app.get('/:username/calendar', leetcode.calendar);
+app.get('/user/:username', leetcode.userData);
+app.get('/user/:username/badges', leetcode.userBadges);
+app.get('/user/:username/solved', leetcode.solvedProblem);
+app.get('/user/:username/contest', leetcode.userContest);
+app.get('/user/:username/contest/history', leetcode.userContestHistory);
+app.get('/user/:username/submission', leetcode.submission);
+app.get('/user/:username/acSubmission', leetcode.acSubmission);
+app.get('/user/:username/calendar', leetcode.calendar);
 
 const {initializeApp} = require('firebase/app');
 const { 
@@ -293,9 +293,16 @@ const firebaseConfig = {
 const firebase = initializeApp(firebaseConfig);
 const db = getFirestore(firebase);
 
-app.get('/group/fetch/:group', async (req, res) => {
-  const groupName = req.params.group;
+app.get('/group/fetch', express.json(), async (req, res) => {
+  const { groupName } = req.body;
   
+  if (!groupName) {
+    return res.status(400).json({
+      error: 'Group name is required in JSON body',
+      example: { groupName: 'mygroup' }
+    });
+  }
+
   try {
     const docRef = doc(db, 'groups', groupName);
     const groupDoc = await getDoc(docRef);
@@ -318,7 +325,7 @@ app.get('/group/fetch/:group', async (req, res) => {
     }
     const userPromises = members.map(async (username: string) => {
       try {
-        const userData = await queryLeetCodeAPI(getUserProfileQuery, { username });
+        const userData = await queryLeetCodeAPI(query, { username });
         
         if (userData.errors) {
           return {
@@ -329,10 +336,19 @@ app.get('/group/fetch/:group', async (req, res) => {
         }
         
         const questionsSolved = userData.data.matchedUser.submitStats.acSubmissionNum[0].count;
+        const easySolved = userData.data.matchedUser.submitStats.acSubmissionNum[1].count;
+        const mediumSolved = userData.data.matchedUser.submitStats.acSubmissionNum[2].count;
+        const hardSolved = userData.data.matchedUser.submitStats.acSubmissionNum[3].count;
+        const avatar = userData.data.matchedUser.profile.userAvatar || '';
         
         return {
           username: username,
-          questionsSolved: questionsSolved
+          avatar: avatar,
+          questionsSolved: questionsSolved,
+          easy: easySolved,
+          medium: mediumSolved,
+          hard: hardSolved,
+          points: easySolved + mediumSolved * 2 + hardSolved * 3,
         };
       } catch (error) {
         return {
@@ -366,50 +382,55 @@ app.get('/group/fetch/:group', async (req, res) => {
   }
 });
 
-app.get('/group/add/:group/:username', async (req, res) => {
-  const username = req.params.username;
-  const groupName = req.params.group;
-  
+app.post('/group/add', express.json(), async (req, res) => {
+  const { username, groupName } = req.body;
+
   if (!groupName) {
     return res.status(400).json({
       error: 'Group name is required',
-      example: '/group/add/john?group=mygroup'
+      example: { username: 'john', groupName: 'mygroup' }
     });
   }
-  
+  if (!username) {
+    return res.status(400).json({
+      error: 'Username is required',
+      example: { username: 'john', groupName: 'mygroup' }
+    });
+  }
+
   try {
     const userData = await queryLeetCodeAPI(query, { username });
-    
+
     if (userData.errors) {
       return res.status(404).json({
         error: 'User not found on LeetCode',
         username: username
       });
     }
-    
+
     const userStatus = userData.data.matchedUser.profile.aboutMe || '';
-    
+
     const docRef = doc(db, 'groups', groupName);
     const groupDoc = await getDoc(docRef);
-    
+
     if (!groupDoc.data()) {
       return res.status(404).json({
         error: 'Group not found',
         groupName: groupName
       });
     }
-    
+
     const groupData = groupDoc.data();
     const groupSecret = groupData?.secret;
     const currentMembers = groupData?.members || [];
-    
+
     if (!groupSecret) {
       return res.status(500).json({
         error: 'Group secret not configured',
         groupName: groupName
       });
     }
-    
+
     if (!userStatus.includes(groupSecret)) {
       return res.status(403).json({
         error: 'Group secret not found in user status',
@@ -418,7 +439,7 @@ app.get('/group/add/:group/:username', async (req, res) => {
         currentStatus: userStatus
       });
     }
-    
+
     if (currentMembers.includes(username)) {
       return res.status(409).json({
         error: 'User is already a member of this group',
@@ -426,15 +447,15 @@ app.get('/group/add/:group/:username', async (req, res) => {
         groupName: groupName
       });
     }
-    
+
     const updatedMembers = [...currentMembers, username];
-    
+
     await updateDoc(docRef, {
       members: updatedMembers
     });
 
     await userGroupHandler(username, groupName);
-    
+
     return res.json({
       success: true,
       message: 'User successfully added to group',
@@ -443,7 +464,7 @@ app.get('/group/add/:group/:username', async (req, res) => {
       totalMembers: updatedMembers.length,
       newMembersList: updatedMembers
     });
-    
+
   } catch (error) {
     console.error('Error adding user to group:', error);
     return res.status(500).json({
@@ -453,43 +474,43 @@ app.get('/group/add/:group/:username', async (req, res) => {
   }
 });
 
-app.get('/group/create/:group/:secret', async (req, res) => {
-  const groupName = req.params.group;
-  const groupSecret = req.params.secret;
+app.post('/group/create', express.json(), async (req, res) => {
+  const { groupName, groupSecret } = req.body;
+
   if (!groupName) {
     return res.status(400).json({
-      error: 'Group name is required',
-      example: '/group/create/mygroup'
+      error: 'Group name is required in JSON body',
+      example: { groupName: 'mygroup', groupSecret: 'mysecret' }
     });
   }
   if (!groupSecret) {
     return res.status(400).json({
-      error: 'Group secret is required',
-      example: '/group/create/mygroup/mysecret'
+      error: 'Group secret is required in JSON body',
+      example: { groupName: 'mygroup', groupSecret: 'mysecret' }
     });
   }
   try {
     const docRef = doc(db, 'groups', groupName);
     const groupDoc = await getDoc(docRef);
-    
+
     if (groupDoc.exists()) {
       return res.status(409).json({
         error: 'Group already exists',
         groupName: groupName
       });
     }
-    
+
     await setDoc(docRef, {
       members: [],
       secret: groupSecret,
     });
-    
+
     return res.json({
       success: true,
       message: 'Group created successfully',
       groupName: groupName
     });
-    
+
   } catch (error) {
     console.error('Error creating group:', error);
     return res.status(500).json({
