@@ -366,4 +366,152 @@ app.get('/group/fetch/:group', async (req, res) => {
   }
 });
 
+app.get('/group/add/:group/:username', async (req, res) => {
+  const username = req.params.username;
+  const groupName = req.params.group;
+  
+  if (!groupName) {
+    return res.status(400).json({
+      error: 'Group name is required',
+      example: '/group/add/john?group=mygroup'
+    });
+  }
+  
+  try {
+    const userData = await queryLeetCodeAPI(query, { username });
+    
+    if (userData.errors) {
+      return res.status(404).json({
+        error: 'User not found on LeetCode',
+        username: username
+      });
+    }
+    
+    const userStatus = userData.data.matchedUser.profile.aboutMe || '';
+    
+    const docRef = doc(db, 'groups', groupName);
+    const groupDoc = await getDoc(docRef);
+    
+    if (!groupDoc.data()) {
+      return res.status(404).json({
+        error: 'Group not found',
+        groupName: groupName
+      });
+    }
+    
+    const groupData = groupDoc.data();
+    const groupSecret = groupData?.secret;
+    const currentMembers = groupData?.members || [];
+    
+    if (!groupSecret) {
+      return res.status(500).json({
+        error: 'Group secret not configured',
+        groupName: groupName
+      });
+    }
+    
+    if (!userStatus.includes(groupSecret)) {
+      return res.status(403).json({
+        error: 'Group secret not found in user status',
+        message: `Please add "${groupSecret}" to your LeetCode profile status/about section`,
+        username: username,
+        currentStatus: userStatus
+      });
+    }
+    
+    if (currentMembers.includes(username)) {
+      return res.status(409).json({
+        error: 'User is already a member of this group',
+        username: username,
+        groupName: groupName
+      });
+    }
+    
+    const updatedMembers = [...currentMembers, username];
+    
+    await updateDoc(docRef, {
+      members: updatedMembers
+    });
+
+    await userGroupHandler(username, groupName);
+    
+    return res.json({
+      success: true,
+      message: 'User successfully added to group',
+      username: username,
+      groupName: groupName,
+      totalMembers: updatedMembers.length,
+      newMembersList: updatedMembers
+    });
+    
+  } catch (error) {
+    console.error('Error adding user to group:', error);
+    return res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+});
+
+app.get('/group/create/:group/:secret', async (req, res) => {
+  const groupName = req.params.group;
+  const groupSecret = req.params.secret;
+  if (!groupName) {
+    return res.status(400).json({
+      error: 'Group name is required',
+      example: '/group/create/mygroup'
+    });
+  }
+  if (!groupSecret) {
+    return res.status(400).json({
+      error: 'Group secret is required',
+      example: '/group/create/mygroup/mysecret'
+    });
+  }
+  try {
+    const docRef = doc(db, 'groups', groupName);
+    const groupDoc = await getDoc(docRef);
+    
+    if (groupDoc.exists()) {
+      return res.status(409).json({
+        error: 'Group already exists',
+        groupName: groupName
+      });
+    }
+    
+    await setDoc(docRef, {
+      members: [],
+      secret: groupSecret,
+    });
+    
+    return res.json({
+      success: true,
+      message: 'Group created successfully',
+      groupName: groupName
+    });
+    
+  } catch (error) {
+    console.error('Error creating group:', error);
+    return res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+});
+
+async function userGroupHandler(username: string, groupName: string) {
+  const docRef = doc(db, 'users', username);
+  const userDoc = await getDoc(docRef);
+  if (!userDoc.exists()) {
+    await setDoc(docRef, { groups: [groupName] });
+  } else {
+    const userData = userDoc.data();
+    const groups = userData?.groups || [];
+    if (!groups.includes(groupName)) {
+      groups.push(groupName);
+      await updateDoc(docRef, { groups });
+    }
+  }
+}
+
 export default app;
