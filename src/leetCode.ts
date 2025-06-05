@@ -4,6 +4,15 @@ import * as formatUtils from './FormatUtils';
 import * as controllers from './Controllers';
 import { TransformedUserDataRequest } from './types';
 
+export const userProfile = (req: TransformedUserDataRequest, res: Response) => {
+  controllers.fetchUserDetails(
+    req.body,
+    res,
+    formatUtils.formatUserDetails,
+    gqlQueries.userProfileQuery
+  );
+};
+
 export const userData = (req: TransformedUserDataRequest, res: Response) => {
   controllers.fetchUserDetails(
     req.body,

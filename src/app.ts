@@ -3,7 +3,6 @@ import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import * as leetcode from './leetCode';
 import { FetchUserDataRequest } from './types';
-import apicache from 'apicache';
 import axios from 'axios';
 import {
   userContestRankingInfoQuery,
@@ -16,9 +15,9 @@ import {
   officialSolutionQuery,
   dailyQeustion,
 } from './GQLQueries/newQueries';
+import query from './GQLQueries/userProfile';
 
 const app = express();
-let cache = apicache.middleware;
 const API_URL = process.env.LEETCODE_API_URL || 'https://leetcode.com/graphql';
 
 const limiter = rateLimit({
@@ -29,7 +28,6 @@ const limiter = rateLimit({
   message: 'Too many request from this IP, try again in 1 hour',
 });
 
-app.use(cache('5 minutes'));
 app.use(cors()); //enable all CORS request
 app.use(limiter); //limit to all API
 app.use((req: express.Request, _res: Response, next: NextFunction) => {

@@ -1,5 +1,13 @@
 import { UserData } from '../types';
 
+export const formatUserDetails = (data: UserData) => ({
+  username: data.matchedUser.username,
+  name: data.matchedUser.profile.realName,
+  avatar: data.matchedUser.profile.userAvatar,
+  about: data.matchedUser.profile.aboutMe,
+  solvedProblem: data.matchedUser.submitStats.acSubmissionNum[0].count,
+});
+
 export const formatUserData = (data: UserData) => ({
   username: data.matchedUser.username,
   name: data.matchedUser.profile.realName,
