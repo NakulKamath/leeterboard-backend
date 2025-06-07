@@ -6,6 +6,7 @@ export const formatUserDetails = (data: UserData) => ({
   avatar: data.matchedUser.profile.userAvatar,
   about: data.matchedUser.profile.aboutMe,
   solvedProblem: data.matchedUser.submitStats.acSubmissionNum[0].count,
+  recentSubmission: data.recentSubmissionList,
 });
 
 export const formatUserData = (data: UserData) => ({

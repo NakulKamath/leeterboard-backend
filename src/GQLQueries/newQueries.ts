@@ -190,6 +190,33 @@ export const skillStatsQuery = `
     }
 `;
 
+export const userStatusQuery = `
+    query userStatus($username: String!) {
+      matchedUser(username: $username) {
+        profile {
+          aboutMe
+          userAvatar
+        }
+      }
+    }`
+
+export const userSubmissionsQuery = `
+  query getUserProfile($username: String!) {
+    matchedUser(username: $username) {
+      submitStats {
+          acSubmissionNum {
+            difficulty
+            count
+            submissions
+          }
+          totalSubmissionNum {
+            difficulty
+            count
+            submissions
+          }
+        }
+      }
+    }`
 
 // queries.ts
 export const getUserProfileQuery = `

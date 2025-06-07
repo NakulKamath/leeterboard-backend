@@ -14,6 +14,7 @@
   "author": "alfaarghya",
   "license": "ISC",
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "apicache": "^1.6.3",
     "axios": "^1.7.2",
     "cors": "^2.8.5",
