@@ -6,7 +6,6 @@ import {
   userStatusQuery,
   userSubmissionsQuery,
 } from './GQLQueries/newQueries';
-import query from './GQLQueries/userProfile';
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const app = express();
@@ -130,7 +129,7 @@ app.get('/group/fetch/:group/:uuid/:code', express.json(), async (req, res) => {
 
     const userPromises = members.map(async (username: string) => {
       try {
-        const userData = await queryLeetCodeAPI(query, { username });
+        const userData = await queryLeetCodeAPI(userSubmissionsQuery, { username });
         
         if (userData.errors) {
           return {
@@ -149,8 +148,8 @@ app.get('/group/fetch/:group/:uuid/:code', express.json(), async (req, res) => {
         const points = easySolved + mediumSolved * 2 + hardSolved * 3;
         
         return {
-          username: username,
           name: name,
+          username: username,
           avatar: avatar,
           questionsSolved: questionsSolved,
           easy: easySolved,
@@ -178,7 +177,6 @@ app.get('/group/fetch/:group/:uuid/:code', express.json(), async (req, res) => {
       return b.questionsSolved - a.questionsSolved;
     });
 
-    console.log(username, uuid, members, username === null && uuid.startsWith('anon-') && members.includes(uuid.slice(5)))
     return res.json({
       success: true,
       groupName: groupName,
@@ -198,7 +196,6 @@ app.get('/group/fetch/:group/:uuid/:code', express.json(), async (req, res) => {
 
 app.post('/user/add-anon', express.json(), async (req, res) => {
   const { username, groupName, secret } = req.body;
-  console.log('Adding anonymous user:', username, 'to group:', groupName);
 
   if (!groupName||!username) {
     return res.status(400).json({
@@ -208,7 +205,7 @@ app.post('/user/add-anon', express.json(), async (req, res) => {
   }
 
   try {
-    const userData = await queryLeetCodeAPI(query, { username });
+    const userData = await queryLeetCodeAPI(userStatusQuery, { username });
 
     if (userData.errors) {
       return res.status(404).json({
@@ -281,7 +278,6 @@ app.post('/user/add-anon', express.json(), async (req, res) => {
 app.post('/user/add', express.json(), async (req, res) => {
   const { uuid, groupName, secret } = req.body;
 
-  console.log('Adding user:', uuid, 'to group:', groupName, 'with secret:', secret);
   if (!groupName||!uuid) {
     return res.status(400).json({
       error: 'All fields are required',

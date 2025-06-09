@@ -203,6 +203,10 @@ export const userStatusQuery = `
 export const userSubmissionsQuery = `
   query getUserProfile($username: String!) {
     matchedUser(username: $username) {
+      profile {
+        realName
+        userAvatar
+      }
       submitStats {
           acSubmissionNum {
             difficulty
