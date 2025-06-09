@@ -1,7 +1,7 @@
 import express, { NextFunction, Response } from 'express';
 import cors from 'cors';
 import axios from 'axios';
-// import apicache from 'apicache';
+import apicache from 'apicache';
 import {
   userStatusQuery,
   userSubmissionsQuery,
@@ -11,7 +11,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const app = express();
 const API_URL = process.env.LEETCODE_API_URL || 'https://leetcode.com/graphql';
 
-// const cache = apicache.middleware;
+const cache = apicache.middleware;
 // app.get('*', cache('5 minutes'));
 app.use(cors());
 app.use((req: express.Request, _res: Response, next: NextFunction) => {
@@ -36,6 +36,15 @@ async function queryLeetCodeAPI(query: string, variables: any) {
   }
 }
 
+<<<<<<< HEAD
+const admin = require('firebase-admin');
+const serviceAccount = require('./servicekey.json');
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
+
+=======
 const {initializeApp} = require('firebase/app');
 const { 
   getFirestore, 
@@ -45,48 +54,34 @@ const {
   setDoc,
   deleteDoc,
 } = require('firebase/firestore');
+>>>>>>> parent of 3427b01 (RC-1 v0.1.0)
 require('dotenv').config();
-const firebaseConfig = {
-  apiKey: process.env.FIREBASE_API_KEY,
-  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.FIREBASE_PROJECT_ID,
-  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.FIREBASE_APP_ID,
-  measurementId: process.env.FIREBASE_MEASUREMENT_ID
-};
 
-const firebase = initializeApp(firebaseConfig);
-const db = getFirestore(firebase);
+const db = admin.firestore();
 
-// app.get('*', (req, res) => {
-//   console.log('Requested URL:', req.originalUrl);
-//   res.json({
-//     message: 'Welcome to LeetCode Groups API',
-//   })
-// });
 
-app.get('/group/fetch/:group/:uuid/:code', express.json(), async (req, res) => {
+app.get('/group/fetch/:group/:uuid/:code', cache('5 minutes'), express.json(), async (req, res) => {
   const groupName = req.params.group;
   const uuid = req.params.uuid;
   const code = req.params.code;
 
   if (!groupName) {
-    return res.status(400).json({
-      error: 'Group name is required in JSON body',
+    return res.json({
+      success: false,
+      message: 'Group name is required in JSON body',
       example: { groupName: 'mygroup' },
       prompt: false
     });
   }
 
   try {
-    const docRef = doc(db, 'groups', groupName);
-    const groupDoc = await getDoc(docRef);
+    const groupDocRef = db.collection('groups').doc(groupName);
+    const groupDoc = await groupDocRef.get();
     
     if (!groupDoc.data()) {
       return res.json({
         success: false,
-        error: 'Group does not exist, or was deleted.',
+        message: 'Group does not exist, or was deleted.',
         groupName: groupName,
         prompt: false
       });
@@ -95,19 +90,20 @@ app.get('/group/fetch/:group/:uuid/:code', express.json(), async (req, res) => {
     const groupData = groupDoc.data();
     const members = groupData?.members || [];
     const privacy = groupData?.privacy;
-    const accountDocRef = doc(db, 'accounts', uuid);
-    const accountDoc = await getDoc(accountDocRef);
+    const accountDocRef = db.collection('accounts').doc(uuid);
+    const accountDoc = await accountDocRef.get();
+
     let username = null;
-    if (accountDoc.exists()) {
+    if (accountDoc.exists) {
       const accountData = accountDoc.data();
       username = accountData.username;
     }
 
     if (privacy && privacy === true && code !== groupData.secret && !(uuid !== "none" && uuid.startsWith('anon-') && members.includes(uuid.slice(5)))) {
-      if (!accountDoc.exists()) {
+      if (!accountDoc.exists) {
         return res.json({
           success: false,
-          error: 'Group is private. Please ask for an invite.',
+          message: 'Group is private. Please ask for an invite.',
           uuid: uuid,
           prompt: false
         });
@@ -118,7 +114,7 @@ app.get('/group/fetch/:group/:uuid/:code', express.json(), async (req, res) => {
         if (!members.includes(user)) {
           return res.json({
             success: false,
-            error: 'You are not a member of this group. Please ask for an invite.',
+            message: 'You are not a member of this group. Please ask for an invite.',
             username: user,
             groupName: groupName
           });
@@ -181,7 +177,7 @@ app.get('/group/fetch/:group/:uuid/:code', express.json(), async (req, res) => {
       groupName: groupName,
       totalMembers: members.length,
       members: sortedUsers,
-      prompt: ((username !== null && !members.includes(username)) || username === null && uuid.startsWith('anon-') && !members.includes(uuid.slice(5))) && code === groupData.secret,
+      prompt: ((username !== null && !members.includes(username)) || username === null && uuid === 'none' || uuid.startsWith('anon-') && !members.includes(uuid.slice(5))) && code === groupData.secret,
       groupSecret: (username !== null && members.includes(username)) || (username === null && uuid.startsWith('anon-') && members.includes(uuid.slice(5))) ? groupData.secret : '',
     });
     
@@ -197,37 +193,42 @@ app.post('/user/add-anon', express.json(), async (req, res) => {
   const { username, groupName, secret } = req.body;
 
   if (!groupName||!username) {
-    return res.status(400).json({
-      error: 'All fields are required',
+    return res.json({
+      success: false,
+      message: 'All fields are required',
       example: { username: 'john', groupName: 'mygroup' }
     });
   }
 
   try {
-    const userData = await queryLeetCodeAPI(userStatusQuery, { username });
+
+    const userData = await queryLeetCodeAPI(userStatusQuery, { username : username.slice(5) });
 
     if (userData.errors) {
-      return res.status(404).json({
-        error: 'User not found on LeetCode',
-        username: username
+      return res.json({
+        success: false,
+        message: 'User not found on LeetCode',
+        username: username.slice(5)
       });
     }
 
     const userStatus = userData.data.matchedUser.profile.aboutMe || '';
 
-    const docRef = doc(db, 'groups', groupName);
-    const groupDoc = await getDoc(docRef);
+    const groupDocRef = db.collection('groups').doc(groupName);
+    const groupDoc = await groupDocRef.get();
 
     if (!groupDoc.data()) {
-      return res.status(404).json({
-        error: 'Group not found',
+      return res.json({
+        success: false,
+        message: 'Group not found',
         groupName: groupName
       });
     }
 
     if (secret != groupDoc.data()?.secret) {
-      return res.status(403).json({
-        error: 'Invalid group secret',
+      return res.json({
+        success: false,
+        message: 'Invalid group secret',
         groupName: groupName
       });
     }
@@ -236,30 +237,31 @@ app.post('/user/add-anon', express.json(), async (req, res) => {
     const groupSecret = groupData?.secret;
     const currentMembers = groupData?.members || [];
 
-    if (!userStatus.includes(groupSecret)) {
-      return res.status(403).json({
-        error: 'Group secret not found in user status',
-        message: `Please add "${groupSecret}" to your LeetCode profile status/about section`,
-        username: username,
-        currentStatus: userStatus
-      });
-    }
-
-    if (currentMembers.includes(username)) {
-      return res.status(409).json({
-        error: 'User is already a member of this group',
-        username: username,
+    if (currentMembers.includes(username.slice(5))) {
+      return res.json({
+        success: true,
+        message: 'User is already a member of this group',
+        username: username.slice(5),
         groupName: groupName
       });
     }
 
-    const updatedMembers = [...currentMembers, username];
+    if (!userStatus.includes(groupSecret)) {
+      return res.json({
+        success: false,
+        message: `Please add "${groupSecret}" to your LeetCode profile status/about section`,
+        username: username.slice(5),
+        currentStatus: userStatus
+      });
+    }
 
-    await updateDoc(docRef, {
+    const updatedMembers = [...currentMembers, username.slice(5)];
+
+    await groupDocRef.update({
       members: updatedMembers
     });
 
-    await userGroupHandler(username, groupName);
+    await userGroupHandler(username.slice(5), groupName);
 
     return res.json({
       success: true,
@@ -278,36 +280,40 @@ app.post('/user/add', express.json(), async (req, res) => {
   const { uuid, groupName, secret } = req.body;
 
   if (!groupName||!uuid) {
-    return res.status(400).json({
-      error: 'All fields are required',
+    return res.json({
+      success: false,
+      message: 'All fields are required',
     });
   }
 
   try {
-    const accountDocRef = doc(db, 'accounts', uuid);
-    const accountDoc = await getDoc(accountDocRef);
-    if (!accountDoc.exists()) {
-      return res.status(404).json({
-        error: 'Your account not linked. Please head to dashboard and link your account first.',
+    const accountDocRef = db.collection('accounts').doc(uuid);
+    const accountDoc = await accountDocRef.get();
+    if (!accountDoc.exists) {
+      return res.json({
+        success: false,
+        message: 'Your account not linked. Please head to dashboard and link your account first.',
         uuid: uuid
       });
     }
     const accountData = accountDoc.data();
     const username = accountData.username;
 
-    const docRef = doc(db, 'groups', groupName);
-    const groupDoc = await getDoc(docRef);
+    const groupDocRef = db.collection('groups').doc(groupName);
+    const groupDoc = await groupDocRef.get();
 
     if (!groupDoc.data()) {
-      return res.status(404).json({
-        error: 'Group not found',
+      return res.json({
+        success: false,
+        message: 'Group not found',
         groupName: groupName
       });
     }
 
     if (secret != groupDoc.data()?.secret) {
-      return res.status(403).json({
-        error: 'Invalid group secret',
+      return res.json({
+        success: false,
+        message: 'Invalid group secret/group secret has changed',
         groupName: groupName
       });
     }
@@ -316,8 +322,9 @@ app.post('/user/add', express.json(), async (req, res) => {
     const currentMembers = groupData?.members || [];
 
     if (currentMembers.includes(username)) {
-      return res.status(409).json({
-        error: 'User is already a member of this group',
+      return res.json({
+        success: true,
+        message: 'User is already a member of this group',
         username: username,
         groupName: groupName
       });
@@ -325,7 +332,7 @@ app.post('/user/add', express.json(), async (req, res) => {
 
     const updatedMembers = [...currentMembers, username];
 
-    await updateDoc(docRef, {
+    await groupDocRef.update({
       members: updatedMembers
     });
 
@@ -348,21 +355,23 @@ app.post('/group/create', express.json(), async (req, res) => {
   const { groupName, groupSecret, privacy, uuid } = req.body;
 
   if (!groupName) {
-    return res.status(400).json({
-      error: 'Group name is required in JSON body',
+    return res.json({
+      success: false,
+      message: 'Group name is required.',
       example: { groupName: 'mygroup', groupSecret: 'mysecret' }
     });
   }
   if (!groupSecret) {
-    return res.status(400).json({
-      error: 'Group secret is required in JSON body',
+    return res.json({
+      success: false,
+      message: 'Group secret is required.',
       example: { groupName: 'mygroup', groupSecret: 'mysecret' }
     });
   }
   try {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-preview-04-17" });
-    const prompt = `Is the group name "${groupName} ${groupSecret}" appropriate? Return "yes" if it is appropriate, otherwise return "no". Do not include any additional text or explanations.`;
+    const prompt = `Do the words/sentences "${groupName}" and "${groupSecret}" contain any inappropriate terms? Return "yes" if it is appropriate, otherwise return "no". Do not include any additional text or explanations.`;
 
     const response = await model.generateContent(prompt);
 
@@ -376,22 +385,23 @@ app.post('/group/create', express.json(), async (req, res) => {
       });
     }
 
-    const accountDocRef = doc(db, 'accounts', uuid);
-    const accountDoc = await getDoc(accountDocRef);
+    const accountDocRef = db.collection('accounts').doc(uuid);
+    const accountDoc = await accountDocRef.get();
 
-    if (!accountDoc.exists()) {
-      return res.status(404).json({
-        error: 'User not registered. Please register first.',
+    if (!accountDoc.exists) {
+      return res.json({
+        success: false,
+        message: 'Account is not linked with leetcode profile.',
         uuid: uuid
       });
     }
     const accountData = accountDoc.data();
     const username = accountData.username;
 
-    const docRef = doc(db, 'groups', groupName);
-    const groupDoc = await getDoc(docRef);
+    const groupDocRef = db.collection('groups').doc(groupName);
+    const groupDoc = await groupDocRef.get();
 
-    if (groupDoc.exists()) {
+    if (groupDoc.exists) {
       return res.json({
         success: false,
         message: 'The group name is taken. Please choose a different name.',
@@ -399,24 +409,24 @@ app.post('/group/create', express.json(), async (req, res) => {
       });
     }
 
-    await setDoc(docRef, {
+    await groupDocRef.set({
       members: [username],
       secret: groupSecret,
       privacy: privacy || false
     });
 
-    const userDocRef = doc(db, 'users', username);
-    const userDoc = await getDoc(userDocRef);
+    const userDocRef = db.collection('users').doc(username);
+    const userDoc = await userDocRef.get();
 
-    if (!userDoc.exists()) {
-      await setDoc(userDocRef, { groups: [groupName], owned: [groupName] });
+    if (!userDoc.exists) {
+      await userDocRef.set({ groups: [groupName], owned: [groupName] });
     } else {
       const userData = userDoc.data();
       const groups = userData?.groups || [];
       const owned = userData?.owned || [];
       groups.push(groupName);
       owned.push(groupName);
-      await updateDoc(userDocRef, { groups, owned });
+      await userDocRef.update({ groups, owned });
     }
 
     return res.json({
@@ -437,30 +447,33 @@ app.post('/group/create', express.json(), async (req, res) => {
 app.post('/group/delete', express.json(), async (req, res) => {
   const { groupName, uuid } = req.body;
   if (!groupName || !uuid) {
-    return res.status(400).json({
-      error: 'Group name and UUID is required in JSON body',
+    return res.json({
+      success: false,
+      message: 'Group name and UUID is required in JSON body',
       example: { groupName: 'mygroup', uuid: 'your-uuid' }
     });
   }
   try {
-    const accountDocRef = doc(db, 'accounts', uuid);
-    const accountDoc = await getDoc(accountDocRef);
+    const accountDocRef = db.collection('accounts').doc(uuid);
+    const accountDoc = await accountDocRef.get();
 
-    if (!accountDoc.exists()) {
-      return res.status(404).json({
-        error: 'User not registered. Please register first.',
+    if (!accountDoc.exists) {
+      return res.json({
+        success: false,
+        message: 'User not registered. Please register first.',
         uuid: uuid
       });
     }
     const accountData = accountDoc.data();
     const username = accountData.username;
 
-    const docRef = doc(db, 'groups', groupName);
-    const groupDoc = await getDoc(docRef);
+    const groupDocRef = db.collection('groups').doc(groupName);
+    const groupDoc = await groupDocRef.get();
 
-    if (!groupDoc.exists()) {
-      return res.status(404).json({
-        error: 'Group not found',
+    if (!groupDoc.exists) {
+      return res.json({
+        success: false,
+        message: 'Group not found/please stop spamming',
         groupName: groupName
       });
     }
@@ -468,12 +481,13 @@ app.post('/group/delete', express.json(), async (req, res) => {
     const groupData = groupDoc.data();
     const members = groupData?.members || [];
 
-    const userDocRef = doc(db, 'users', username);
-    const userDoc = await getDoc(userDocRef);
+    const userDocRef = db.collection('users').doc(username);
+    const userDoc = await userDocRef.get();
 
-    if (!userDoc.exists()) {
-      return res.status(404).json({
-        error: 'User not found',
+    if (!userDoc.exists) {
+      return res.json({
+        success: false,
+        message: 'User not found',
         username: username
       });
     }
@@ -482,25 +496,24 @@ app.post('/group/delete', express.json(), async (req, res) => {
     const prevOwned = userData?.owned || [];
 
     const owned = prevOwned.filter((g: string) => g !== groupName);
-    await updateDoc(userDocRef, { owned });
+    await userDocRef.update({ owned });
 
     for (const member of members) {
-      const memberDocRef = doc(db, 'users', member);
-      const memberDoc = await getDoc(memberDocRef);
+      const memberDocRef = db.collection('users').doc(member);
+      const memberDoc = await memberDocRef.get();
 
-      if (memberDoc.exists()) {
+      if (memberDoc.exists) {
         const memberData = memberDoc.data();
         const memberGroups = memberData?.groups || [];
         const updatedGroups = memberGroups.filter((g: string) => g !== groupName);
-        await updateDoc(memberDocRef, { groups: updatedGroups });
+        await memberDocRef.update({ groups: updatedGroups });
       }
     }
-    await deleteDoc(docRef);
+    await groupDocRef.delete();
     
     return res.json({
       success: true,
       message: 'User removed from group successfully',
-      username: username,
       groupName: groupName,
     });
     
@@ -523,10 +536,10 @@ app.get('/user/status/:uuid', express.json(), async (req, res) => {
   }
 
   try {
-    const docRef = doc(db, 'accounts', uuid);
-    const userDoc = await getDoc(docRef);
+    const accountDocRef = db.collection('accounts').doc(uuid);
+    const userDoc = await accountDocRef.get();
     return res.status(200).json({
-      found : userDoc.exists(),
+      found : userDoc.exists,
     })
   } catch (error) {
     return res.status(500).json({
@@ -539,24 +552,27 @@ app.get('/user/status/:uuid', express.json(), async (req, res) => {
 app.get('/user/profile/:uuid', express.json(), async (req, res) => {
   const { uuid } = req.params;
   if (!uuid) {
-    return res.status(400).json({
-      error: 'UUID is required'
+    return res.json({
+      success: false,
+      message: 'UUID is required'
     });
   }
   try {
-    const accountDocRefdocRef = doc(db, 'accounts', uuid);
-    const accountDoc = await getDoc(accountDocRefdocRef);
-    if (!accountDoc.exists()) {
-      return res.status(404).json({
-        error: 'User not found',
+    const accountDocRef = db.collection('accounts').doc(uuid);
+    const accountDoc = await accountDocRef.get();
+
+    if (!accountDoc.exists) {
+      return res.json({
+        success: false,
+        message: 'User not found',
         uuid: uuid
       });
     }
     const accountData = accountDoc.data();
-    const userDocRef = doc(db, 'users', accountData.username);
-    const userDoc = await getDoc(userDocRef);
-    if (!userDoc.exists()) {
-      await setDoc(userDocRef, { groups: [], owned: [] });
+    const userDocRef = db.collection('users').doc(accountData.username);
+    const userDoc = await userDocRef.get();
+    if (!userDoc.exists) {
+      await userDocRef.set({ groups: [], owned: [] });
     }
     const userData = userDoc.data();
     const userSubmissionStats = await queryLeetCodeAPI(userSubmissionsQuery, { username: accountData.username });
@@ -566,9 +582,9 @@ app.get('/user/profile/:uuid', express.json(), async (req, res) => {
       ownedGroups = await Promise.all(
       userData.owned.map(async (groupName: string) => {
         try {
-        const groupDocRef = doc(db, 'groups', groupName);
-        const groupDoc = await getDoc(groupDocRef);
-        return [groupName, groupDoc.exists() ? groupDoc.data() : null];
+        const groupDocRef = db.collection('groups').doc(groupName);
+        const groupDoc = await groupDocRef.get();
+        return [groupName, groupDoc.exists ? groupDoc.data() : null];
         } catch (e) {
         return [groupName, null];
         }
@@ -576,6 +592,8 @@ app.get('/user/profile/:uuid', express.json(), async (req, res) => {
       );
     }
     return res.json({
+      success: true,
+      message: 'User profile fetched successfully',
       username: accountData.username,
       userAvatar: accountData.userAvatar,
       groups: userData.groups || [],
@@ -601,11 +619,12 @@ app.post('/user/register', express.json(), async (req, res) => {
     });
   }
   try {
-    const docRef = doc(db, 'accounts', uuid);
-    const userDoc = await getDoc(docRef);
-    if (userDoc.exists()) {
-      return res.status(409).json({
-        error: 'User already Linked',
+    const accountDocRef = db.collection('accounts').doc(uuid);
+    const userDoc = await accountDocRef.get();
+    if (userDoc.exists) {
+      return res.json({
+        success: false,
+        message: 'User already Linked',
         uuid: uuid
       });
     }
@@ -614,15 +633,17 @@ app.post('/user/register', express.json(), async (req, res) => {
     const userAvatar = userStatus.data.matchedUser.profile.userAvatar || '';
 
     if (!status.includes(uuid)) {
-      return res.status(403).json({
-        error: 'Please add uuid to your LeetCode profile status/about section',
+      return res.json({
+        success: false,
+        message: 'Please add the code to your LeetCode profile status/about section and try again.',
         username: username,
         currentStatus: status
       });
     }
-    await setDoc(docRef, { username, userAvatar });
+    await accountDocRef.set({ username, userAvatar });
 
     return res.json({
+      success: true,
       message: 'User registered successfully',
       username: username,
       userAvatar: userAvatar,
@@ -638,23 +659,24 @@ app.post('/user/register', express.json(), async (req, res) => {
 app.post('/group/change-privacy', express.json(), async (req, res) => {
   const { groupName, privacy } = req.body;
   if (!groupName || privacy === null || privacy === undefined) {
-    return res.status(400).json({
-      error: 'Group name and privacy are required',
+    return res.json({
+      success: false,
+      message: 'Group name and privacy are required',
       example: { groupName: 'mygroup', privacy: 'public' }
     });
   }
   try {
-    const docRef = doc(db, 'groups', groupName);
-    const groupDoc = await getDoc(docRef);
+    const groupDocRef = db.collection('groups').doc(groupName);
+    const groupDoc = await groupDocRef.get();
 
-    if (!groupDoc.exists()) {
+    if (!groupDoc.exists) {
       return res.status(404).json({
         error: 'Group not found',
         groupName: groupName
       });
     }
 
-    await updateDoc(docRef, { privacy });
+    await groupDocRef.update({ privacy });
 
     return res.json({
       success: true,
@@ -674,28 +696,23 @@ app.post('/group/change-privacy', express.json(), async (req, res) => {
 app.post('/group/change-secret', express.json(), async (req, res) => {
   const { groupName, newSecret } = req.body;
   if (!groupName || !newSecret) {
-    return res.status(400).json({
-      error: 'Group name and new secret are required',
+    return res.json({
+      success: false,
+      message: 'Group name and new secret are required',
       example: { groupName: 'mygroup', newSecret: 'newsecret' }
     });
   }
   try {
-    const docRef = doc(db, 'groups', groupName);
-    const groupDoc = await getDoc(docRef);
-    if (!groupDoc.exists()) {
-      return res.status(404).json({
-        error: 'Group not found',
+    const groupDocRef = db.collection('groups').doc(groupName);
+    const groupDoc = await groupDocRef.get();
+    if (!groupDoc.exists) {
+      return res.json({
+        success: false,
+        message: 'Group not found',
         groupName: groupName
       });
     }
-    const groupData = groupDoc.data();
-    if (!groupData.secret) {
-      return res.status(400).json({
-        error: 'Group secret is not set',
-        groupName: groupName
-      });
-    }
-    await updateDoc(docRef, { secret: newSecret });
+    await groupDocRef.update({ secret: newSecret });
     return res.json({
       success: true,
       message: 'Group secret updated successfully',
@@ -711,16 +728,16 @@ app.post('/group/change-secret', express.json(), async (req, res) => {
 });
 
 async function userGroupHandler(username: string, groupName: string) {
-  const docRef = doc(db, 'users', username);
-  const userDoc = await getDoc(docRef);
-  if (!userDoc.exists()) {
-    await setDoc(docRef, { groups: [groupName], owned: [] });
+  const userDocRef = db.collection('users').doc(username);
+  const userDoc = await userDocRef.get();
+  if (!userDoc.exists) {
+    await userDocRef.set({ groups: [groupName], owned: [] });
   } else {
     const userData = userDoc.data();
     const groups = userData?.groups || [];
     if (!groups.includes(groupName)) {
       groups.push(groupName);
-      await updateDoc(docRef, { groups });
+      await userDocRef.update({ groups });
     }
   }
 }
