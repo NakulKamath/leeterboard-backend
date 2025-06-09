@@ -36,7 +36,6 @@ async function queryLeetCodeAPI(query: string, variables: any) {
   }
 }
 
-<<<<<<< HEAD
 const admin = require('firebase-admin');
 const serviceAccount = require('./servicekey.json');
 
@@ -44,17 +43,6 @@ admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
 
-=======
-const {initializeApp} = require('firebase/app');
-const { 
-  getFirestore, 
-  getDoc,
-  doc,
-  updateDoc,
-  setDoc,
-  deleteDoc,
-} = require('firebase/firestore');
->>>>>>> parent of 3427b01 (RC-1 v0.1.0)
 require('dotenv').config();
 
 const db = admin.firestore();
