@@ -31,21 +31,11 @@ async function queryLeetCodeAPI(query: string, variables: any) {
       throw new Error(`Error from LeetCode API: ${error.response.data}`);
     } else if (error.request) {
       throw new Error('No response received from LeetCode API');
-    } else {
       throw new Error(`Error in setting up the request: ${error.message}`);
     }
   }
 }
 
-<<<<<<< HEAD
-const admin = require('firebase-admin');
-const serviceAccount = require('./servicekey.json');
-
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
-
-=======
 const {initializeApp} = require('firebase/app');
 const { 
   getFirestore, 
@@ -55,7 +45,6 @@ const {
   setDoc,
   deleteDoc,
 } = require('firebase/firestore');
->>>>>>> parent of 3427b01 (RC-1 v0.1.0)
 require('dotenv').config();
 const firebaseConfig = {
   apiKey: process.env.FIREBASE_API_KEY,
