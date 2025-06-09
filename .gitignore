@@ -4,5 +4,9 @@ leetCode-api.txt
 
 dist
 .env
+<<<<<<< HEAD
 .DS_Store
 src/servicekey.json
+=======
+.DS_Store
+>>>>>>> parent of 3427b01 (RC-1 v0.1.0)
