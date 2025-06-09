@@ -5,3 +5,4 @@ leetCode-api.txt
 dist
 .env
 .DS_Store
+servicekey.json
