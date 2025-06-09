@@ -38,7 +38,7 @@ async function queryLeetCodeAPI(query: string, variables: any) {
 }
 
 const admin = require('firebase-admin');
-const serviceAccount = require('../servicekey.json');
+const serviceAccount = require('./servicekey.json');
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
