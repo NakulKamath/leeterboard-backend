@@ -1,6 +1,7 @@
 import express, { NextFunction, Response } from 'express';
 import cors from 'cors';
 import axios from 'axios';
+// import apicache from 'apicache';
 import {
   userStatusQuery,
   userSubmissionsQuery,
@@ -11,7 +12,9 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const app = express();
 const API_URL = process.env.LEETCODE_API_URL || 'https://leetcode.com/graphql';
 
-app.use(cors()); //enable all CORS request
+// const cache = apicache.middleware;
+// app.get('*', cache('5 minutes'));
+app.use(cors());
 app.use((req: express.Request, _res: Response, next: NextFunction) => {
   console.log('Requested URL:', req.originalUrl);
   next();
@@ -58,14 +61,23 @@ const firebaseConfig = {
 const firebase = initializeApp(firebaseConfig);
 const db = getFirestore(firebase);
 
-app.get('/group/fetch/:group/:uuid', express.json(), async (req, res) => {
+// app.get('*', (req, res) => {
+//   console.log('Requested URL:', req.originalUrl);
+//   res.json({
+//     message: 'Welcome to LeetCode Groups API',
+//   })
+// });
+
+app.get('/group/fetch/:group/:uuid/:code', express.json(), async (req, res) => {
   const groupName = req.params.group;
   const uuid = req.params.uuid;
-  
+  const code = req.params.code;
+
   if (!groupName) {
     return res.status(400).json({
       error: 'Group name is required in JSON body',
-      example: { groupName: 'mygroup' }
+      example: { groupName: 'mygroup' },
+      prompt: false
     });
   }
 
@@ -76,34 +88,43 @@ app.get('/group/fetch/:group/:uuid', express.json(), async (req, res) => {
     if (!groupDoc.data()) {
       return res.json({
         success: false,
-        error: 'Group not found',
-        groupName: groupName
+        error: 'Group does not exist, or was deleted.',
+        groupName: groupName,
+        prompt: false
       });
     }
 
     const groupData = groupDoc.data();
-    const members = groupData?.members;
+    const members = groupData?.members || [];
     const privacy = groupData?.privacy;
+    const accountDocRef = doc(db, 'accounts', uuid);
+    const accountDoc = await getDoc(accountDocRef);
+    let username = null;
+    if (accountDoc.exists()) {
+      const accountData = accountDoc.data();
+      username = accountData.username;
+    }
 
-    if (privacy && privacy === true) {
-      const accountDocRef = doc(db, 'accounts', uuid);
-      const accountDoc = await getDoc(accountDocRef);
+    if (privacy && privacy === true && code !== groupData.secret && !(uuid !== "none" && uuid.startsWith('anon-') && members.includes(uuid.slice(5)))) {
       if (!accountDoc.exists()) {
         return res.json({
           success: false,
-          error: 'Group is private. Please register first.',
-          uuid: uuid
+          error: 'Group is private. Please ask for an invite.',
+          uuid: uuid,
+          prompt: false
         });
       }
-      const accountData = accountDoc.data();
-      const username = accountData.username;
-      if (!members.includes(username)) {
-        return res.json({
-          success: false,
-          error: 'You are not a member of this group.',
-          username: username,
-          groupName: groupName
-        });
+      if (code !== groupData.secret) {
+        const accountData = accountDoc.data();
+        const user = accountData.username;
+        if (!members.includes(user)) {
+          return res.json({
+            success: false,
+            error: 'You are not a member of this group. Please ask for an invite.',
+            username: user,
+            groupName: groupName
+          });
+        }
       }
     }
 
@@ -157,11 +178,14 @@ app.get('/group/fetch/:group/:uuid', express.json(), async (req, res) => {
       return b.questionsSolved - a.questionsSolved;
     });
 
+    console.log(username, uuid, members, username === null && uuid.startsWith('anon-') && members.includes(uuid.slice(5)))
     return res.json({
       success: true,
       groupName: groupName,
       totalMembers: members.length,
-      members: sortedUsers
+      members: sortedUsers,
+      prompt: ((username !== null && !members.includes(username)) || username === null && uuid.startsWith('anon-') && !members.includes(uuid.slice(5))) && code === groupData.secret,
+      groupSecret: (username !== null && members.includes(username)) || (username === null && uuid.startsWith('anon-') && members.includes(uuid.slice(5))) ? groupData.secret : '',
     });
     
   } catch (error) {
@@ -172,8 +196,9 @@ app.get('/group/fetch/:group/:uuid', express.json(), async (req, res) => {
   }
 });
 
-app.post('/group/add', express.json(), async (req, res) => {
-  const { username, groupName } = req.body;
+app.post('/user/add-anon', express.json(), async (req, res) => {
+  const { username, groupName, secret } = req.body;
+  console.log('Adding anonymous user:', username, 'to group:', groupName);
 
   if (!groupName||!username) {
     return res.status(400).json({
@@ -204,16 +229,16 @@ app.post('/group/add', express.json(), async (req, res) => {
       });
     }
 
-    const groupData = groupDoc.data();
-    const groupSecret = groupData?.secret;
-    const currentMembers = groupData?.members || [];
-
-    if (!groupSecret) {
-      return res.status(500).json({
-        error: 'Group secret not configured',
+    if (secret != groupDoc.data()?.secret) {
+      return res.status(403).json({
+        error: 'Invalid group secret',
         groupName: groupName
       });
     }
+
+    const groupData = groupDoc.data();
+    const groupSecret = groupData?.secret;
+    const currentMembers = groupData?.members || [];
 
     if (!userStatus.includes(groupSecret)) {
       return res.status(403).json({
@@ -242,11 +267,78 @@ app.post('/group/add', express.json(), async (req, res) => {
 
     return res.json({
       success: true,
-      message: 'User successfully added to group',
-      username: username,
-      groupName: groupName,
-      totalMembers: updatedMembers.length,
-      newMembersList: updatedMembers
+      message: 'User successfully added to group'
+    });
+
+  } catch (error) {
+    return res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+});
+
+app.post('/user/add', express.json(), async (req, res) => {
+  const { uuid, groupName, secret } = req.body;
+
+  console.log('Adding user:', uuid, 'to group:', groupName, 'with secret:', secret);
+  if (!groupName||!uuid) {
+    return res.status(400).json({
+      error: 'All fields are required',
+    });
+  }
+
+  try {
+    const accountDocRef = doc(db, 'accounts', uuid);
+    const accountDoc = await getDoc(accountDocRef);
+    if (!accountDoc.exists()) {
+      return res.status(404).json({
+        error: 'Your account not linked. Please head to dashboard and link your account first.',
+        uuid: uuid
+      });
+    }
+    const accountData = accountDoc.data();
+    const username = accountData.username;
+
+    const docRef = doc(db, 'groups', groupName);
+    const groupDoc = await getDoc(docRef);
+
+    if (!groupDoc.data()) {
+      return res.status(404).json({
+        error: 'Group not found',
+        groupName: groupName
+      });
+    }
+
+    if (secret != groupDoc.data()?.secret) {
+      return res.status(403).json({
+        error: 'Invalid group secret',
+        groupName: groupName
+      });
+    }
+
+    const groupData = groupDoc.data();
+    const currentMembers = groupData?.members || [];
+
+    if (currentMembers.includes(username)) {
+      return res.status(409).json({
+        error: 'User is already a member of this group',
+        username: username,
+        groupName: groupName
+      });
+    }
+
+    const updatedMembers = [...currentMembers, username];
+
+    await updateDoc(docRef, {
+      members: updatedMembers
+    });
+
+    await userGroupHandler(username, groupName);
+
+    return res.json({
+      success: true,
+      message: 'User successfully added to group'
     });
 
   } catch (error) {
