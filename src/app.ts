@@ -362,7 +362,7 @@ app.post('/group/create', express.json(), async (req, res) => {
   try {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-preview-04-17" });
-    const prompt = `Do the words/sentences "${groupName}" and "${groupSecret}" contain any inappropriate terms? Return "yes" if it is appropriate, otherwise return "no". Do not include any additional text or explanations.`;
+    const prompt = `Are the words/sentences "${groupName}" and "${groupSecret}" appropriate? Return "yes" if it is appropriate, otherwise return "no". Do not include any additional text or explanations.`;
 
     const response = await model.generateContent(prompt);
 
