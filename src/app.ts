@@ -36,14 +36,17 @@ async function queryLeetCodeAPI(query: string, variables: any) {
   }
 }
 
+require('dotenv').config();
+
 const admin = require('firebase-admin');
-const serviceAccount = require('./servicekey.json');
+if (!process.env.FIREBASE_CONFIG_JSON) {
+  throw new Error('FIREBASE_CONFIG_JSON environment variable is not set');
+}
+const serviceAccount = JSON.parse(process.env.FIREBASE_CONFIG_JSON);
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
-
-require('dotenv').config();
 
 const db = admin.firestore();
 
