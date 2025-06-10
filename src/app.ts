@@ -66,7 +66,7 @@ app.get('/group/fetch/:group/:uuid/:code', cache('5 minutes'), express.json(), a
   }
 
   try {
-    const groupDocRef = db.collection('groups').doc(groupName);
+    const groupDocRef = db.collection('groups').doc(groupName.replace(/\s+/g, ' ').trim());
     const groupDoc = await groupDocRef.get();
     
     if (!groupDoc.data()) {
@@ -81,7 +81,7 @@ app.get('/group/fetch/:group/:uuid/:code', cache('5 minutes'), express.json(), a
     const groupData = groupDoc.data();
     const members = groupData?.members || [];
     const privacy = groupData?.privacy;
-    const accountDocRef = db.collection('accounts').doc(uuid);
+    const accountDocRef = db.collection('accounts').doc(uuid.replace(/\s+/g, ' ').trim());
     const accountDoc = await accountDocRef.get();
 
     let username = null;
@@ -205,7 +205,7 @@ app.post('/user/add-anon', express.json(), async (req, res) => {
 
     const userStatus = userData.data.matchedUser.profile.aboutMe || '';
 
-    const groupDocRef = db.collection('groups').doc(groupName);
+    const groupDocRef = db.collection('groups').doc(groupName.replace(/\s+/g, ' ').trim());
     const groupDoc = await groupDocRef.get();
 
     if (!groupDoc.data()) {
@@ -278,7 +278,7 @@ app.post('/user/add', express.json(), async (req, res) => {
   }
 
   try {
-    const accountDocRef = db.collection('accounts').doc(uuid);
+    const accountDocRef = db.collection('accounts').doc(uuid.replace(/\s+/g, ' ').trim());
     const accountDoc = await accountDocRef.get();
     if (!accountDoc.exists) {
       return res.json({
@@ -290,7 +290,7 @@ app.post('/user/add', express.json(), async (req, res) => {
     const accountData = accountDoc.data();
     const username = accountData.username;
 
-    const groupDocRef = db.collection('groups').doc(groupName);
+    const groupDocRef = db.collection('groups').doc(groupName.replace(/\s+/g, ' ').trim());
     const groupDoc = await groupDocRef.get();
 
     if (!groupDoc.data()) {
@@ -376,7 +376,7 @@ app.post('/group/create', express.json(), async (req, res) => {
       });
     }
 
-    const accountDocRef = db.collection('accounts').doc(uuid);
+    const accountDocRef = db.collection('accounts').doc(uuid.replace(/\s+/g, ' ').trim());
     const accountDoc = await accountDocRef.get();
 
     if (!accountDoc.exists) {
@@ -389,7 +389,7 @@ app.post('/group/create', express.json(), async (req, res) => {
     const accountData = accountDoc.data();
     const username = accountData.username;
 
-    const groupDocRef = db.collection('groups').doc(groupName);
+    const groupDocRef = db.collection('groups').doc(groupName.replace(/\s+/g, ' ').trim());
     const groupDoc = await groupDocRef.get();
 
     if (groupDoc.exists) {
@@ -402,15 +402,18 @@ app.post('/group/create', express.json(), async (req, res) => {
 
     await groupDocRef.set({
       members: [username],
-      secret: groupSecret,
+      secret: groupSecret.trim(),
       privacy: privacy || false
     });
 
-    const userDocRef = db.collection('users').doc(username);
+    const userDocRef = db.collection('users').doc(username.replace(/\s+/g, ' ').trim());
     const userDoc = await userDocRef.get();
 
     if (!userDoc.exists) {
-      await userDocRef.set({ groups: [groupName], owned: [groupName] });
+      await userDocRef.set({ 
+        groups: [groupName.replace(/\s+/g, ' ').trim()], 
+        owned: [groupName.replace(/\s+/g, ' ').trim()] 
+      });
     } else {
       const userData = userDoc.data();
       const groups = userData?.groups || [];
@@ -445,7 +448,7 @@ app.post('/group/delete', express.json(), async (req, res) => {
     });
   }
   try {
-    const accountDocRef = db.collection('accounts').doc(uuid);
+    const accountDocRef = db.collection('accounts').doc(uuid.replace(/\s+/g, ' ').trim());
     const accountDoc = await accountDocRef.get();
 
     if (!accountDoc.exists) {
@@ -458,7 +461,7 @@ app.post('/group/delete', express.json(), async (req, res) => {
     const accountData = accountDoc.data();
     const username = accountData.username;
 
-    const groupDocRef = db.collection('groups').doc(groupName);
+    const groupDocRef = db.collection('groups').doc(groupName.replace(/\s+/g, ' ').trim());
     const groupDoc = await groupDocRef.get();
 
     if (!groupDoc.exists) {
@@ -472,7 +475,7 @@ app.post('/group/delete', express.json(), async (req, res) => {
     const groupData = groupDoc.data();
     const members = groupData?.members || [];
 
-    const userDocRef = db.collection('users').doc(username);
+    const userDocRef = db.collection('users').doc(username.replace(/\s+/g, ' ').trim());
     const userDoc = await userDocRef.get();
 
     if (!userDoc.exists) {
@@ -490,7 +493,7 @@ app.post('/group/delete', express.json(), async (req, res) => {
     await userDocRef.update({ owned });
 
     for (const member of members) {
-      const memberDocRef = db.collection('users').doc(member);
+      const memberDocRef = db.collection('users').doc(member.replace(/\s+/g, ' ').trim());
       const memberDoc = await memberDocRef.get();
 
       if (memberDoc.exists) {
@@ -527,7 +530,7 @@ app.get('/user/status/:uuid', express.json(), async (req, res) => {
   }
 
   try {
-    const accountDocRef = db.collection('accounts').doc(uuid);
+    const accountDocRef = db.collection('accounts').doc(uuid.replace(/\s+/g, ' ').trim());
     const userDoc = await accountDocRef.get();
     return res.status(200).json({
       found : userDoc.exists,
@@ -549,7 +552,7 @@ app.get('/user/profile/:uuid', express.json(), async (req, res) => {
     });
   }
   try {
-    const accountDocRef = db.collection('accounts').doc(uuid);
+    const accountDocRef = db.collection('accounts').doc(uuid.replace(/\s+/g, ' ').trim());
     const accountDoc = await accountDocRef.get();
 
     if (!accountDoc.exists) {
@@ -560,7 +563,7 @@ app.get('/user/profile/:uuid', express.json(), async (req, res) => {
       });
     }
     const accountData = accountDoc.data();
-    const userDocRef = db.collection('users').doc(accountData.username);
+    const userDocRef = db.collection('users').doc(accountData.username.replace(/\s+/g, ' ').trim());
     const userDoc = await userDocRef.get();
     if (!userDoc.exists) {
       await userDocRef.set({ groups: [], owned: [] });
@@ -573,7 +576,7 @@ app.get('/user/profile/:uuid', express.json(), async (req, res) => {
       ownedGroups = await Promise.all(
       userData.owned.map(async (groupName: string) => {
         try {
-        const groupDocRef = db.collection('groups').doc(groupName);
+        const groupDocRef = db.collection('groups').doc(groupName.replace(/\s+/g, ' ').trim());
         const groupDoc = await groupDocRef.get();
         return [groupName, groupDoc.exists ? groupDoc.data() : null];
         } catch (e) {
@@ -610,7 +613,7 @@ app.post('/user/register', express.json(), async (req, res) => {
     });
   }
   try {
-    const accountDocRef = db.collection('accounts').doc(uuid);
+    const accountDocRef = db.collection('accounts').doc(uuid.replace(/\s+/g, ' ').trim());
     const userDoc = await accountDocRef.get();
     if (userDoc.exists) {
       return res.json({
@@ -631,7 +634,7 @@ app.post('/user/register', express.json(), async (req, res) => {
         currentStatus: status
       });
     }
-    await accountDocRef.set({ username, userAvatar });
+    await accountDocRef.set({ username: username.replace(/\s+/g, ' ').trim(), userAvatar: userAvatar.replace(/\s+/g, ' ').trim() });
 
     return res.json({
       success: true,
@@ -657,7 +660,7 @@ app.post('/group/change-privacy', express.json(), async (req, res) => {
     });
   }
   try {
-    const groupDocRef = db.collection('groups').doc(groupName);
+    const groupDocRef = db.collection('groups').doc(groupName.replace(/\s+/g, ' ').trim());
     const groupDoc = await groupDocRef.get();
 
     if (!groupDoc.exists) {
@@ -694,7 +697,7 @@ app.post('/group/change-secret', express.json(), async (req, res) => {
     });
   }
   try {
-    const groupDocRef = db.collection('groups').doc(groupName);
+    const groupDocRef = db.collection('groups').doc(groupName.replace(/\s+/g, ' ').trim());
     const groupDoc = await groupDocRef.get();
     if (!groupDoc.exists) {
       return res.json({
@@ -719,10 +722,10 @@ app.post('/group/change-secret', express.json(), async (req, res) => {
 });
 
 async function userGroupHandler(username: string, groupName: string) {
-  const userDocRef = db.collection('users').doc(username);
+  const userDocRef = db.collection('users').doc(username.replace(/\s+/g, ' ').trim());
   const userDoc = await userDocRef.get();
   if (!userDoc.exists) {
-    await userDocRef.set({ groups: [groupName], owned: [] });
+    await userDocRef.set({ groups: [groupName.replace(/\s+/g, ' ').trim()], owned: [] });
   } else {
     const userData = userDoc.data();
     const groups = userData?.groups || [];
