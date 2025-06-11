@@ -1,6 +1,7 @@
 import express, { NextFunction, Response } from 'express';
 import cors from 'cors';
 import axios from 'axios';
+import rateLimit from 'express-rate-limit';
 import {
   userStatusQuery,
   userSubmissionsQuery,
@@ -10,10 +11,27 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const app = express();
 const API_URL = process.env.LEETCODE_API_URL || 'https://leetcode.com/graphql';
 
+const limiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'Too many requests, please try again later.',
+  },
+});
+
+app.use(limiter);
+
 app.use(cors());
 app.use((req: express.Request, _res: Response, next: NextFunction) => {
+  const origin = req.get('Origin');
+  if (origin && !origin.includes('leeterboard.xyz')) {
+    return _res.status(403).json({ error: 'Access denied' });
+  }
+
   console.log('Requested URL:', req.originalUrl);
-  next();
+  return next();
 });
 
 async function queryLeetCodeAPI(query: string, variables: any) {
