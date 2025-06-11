@@ -1,7 +1,6 @@
 import express, { NextFunction, Response } from 'express';
 import cors from 'cors';
 import axios from 'axios';
-import apicache from 'apicache';
 import {
   userStatusQuery,
   userSubmissionsQuery,
@@ -11,8 +10,6 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const app = express();
 const API_URL = process.env.LEETCODE_API_URL || 'https://leetcode.com/graphql';
 
-const cache = apicache.middleware;
-// app.get('*', cache('5 minutes'));
 app.use(cors());
 app.use((req: express.Request, _res: Response, next: NextFunction) => {
   console.log('Requested URL:', req.originalUrl);
@@ -73,7 +70,7 @@ app.get('/', (_req, res) => {
 });
 
 
-app.get('/group/fetch/:group/:uuid/:code', cache('5 minutes'), express.json(), async (req, res) => {
+app.get('/group/fetch/:group/:uuid/:code', express.json(), async (req, res) => {
   const groupName = req.params.group;
   const uuid = req.params.uuid;
   const code = req.params.code;
@@ -364,6 +361,91 @@ app.post('/user/add', express.json(), async (req, res) => {
   }
 });
 
+app.post('/user/remove', express.json(), async (req, res) => {
+  const { uuid, groupName } = req.body;
+  let username = req.body.username;
+  if (!groupName || !uuid && !username) {
+    return res.json({
+      success: false,
+      message: 'Group name and UUID or username are required',
+      example: { groupName: 'mygroup', uuid: 'your-uuid', username: 'john' }
+    });
+  }
+  try {
+    if (uuid) {
+      const accountDocRef = db.collection('accounts').doc(uuid.replace(/\s+/g, ' ').trim());
+      const accountDoc = await accountDocRef.get();
+
+      if (!accountDoc.exists) {
+        return res.json({
+          success: false,
+          message: 'User not registered. Please register first.',
+          uuid: uuid
+        });
+      }
+      const accountData = accountDoc.data();
+      username = accountData.username;
+    }
+      const groupDocRef = db.collection('groups').doc(groupName.replace(/\s+/g, ' ').trim());
+      const groupDoc = await groupDocRef.get();
+      const userDocRef = db.collection('users').doc(username.replace(/\s+/g, ' ').trim());
+      const userDoc = await userDocRef.get();
+      if (!groupDoc.exists) {
+        return res.json({
+          success: false,
+          message: 'Group not found',
+          groupName: groupName
+        });
+      }
+      if (!userDoc.exists) {
+        return res.json({
+          success: false,
+          message: 'User not found',
+          username: username
+        });
+      }
+      const groupData = groupDoc.data();
+      const userData = userDoc.data();
+      if (userData.owned.includes(groupName)) {
+        return res.json({
+          success: false,
+          message: 'You cannot remove yourself from a group you own. Please delete the group instead.',
+          username: username,
+          groupName: groupName
+        })
+      }
+      const members = groupData?.members || [];
+      if (!members.includes(username)) {
+        return res.json({
+          success: false,
+          message: 'User is not a member of this group',
+          username: username,
+          groupName: groupName
+        });
+      }
+      const updatedMembers = members.filter((member: string) => member !== username);
+      await groupDocRef.update({
+        members: updatedMembers
+      });
+      const userGroups = userData?.groups || [];
+      const updatedGroups = userGroups.filter((group: string) => group !== groupName);
+      await userDocRef.update({
+        groups: updatedGroups
+      });
+      return res.json({
+        success: true,
+        message: 'User removed from group successfully',
+        groupName: groupName,
+        username: username
+      });
+  } catch (error) {
+    return res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+});
+
 app.post('/group/create', express.json(), async (req, res) => {
   const { groupName, groupSecret, privacy, uuid } = req.body;
 
@@ -644,7 +726,15 @@ app.post('/user/register', express.json(), async (req, res) => {
         uuid: uuid
       });
     }
-    const userStatus = await queryLeetCodeAPI(userStatusQuery, { username });
+    
+    const userStatus = await queryLeetCodeAPI(userStatusQuery, { username: username });
+    if (userStatus === undefined) {
+      return res.json({
+        success: false,
+        message: 'User not found on LeetCode',
+        username: username
+      });
+    }
     const status = userStatus.data.matchedUser.profile.aboutMe || '';
     const userAvatar = userStatus.data.matchedUser.profile.userAvatar || '';
 
