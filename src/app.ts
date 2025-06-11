@@ -50,6 +50,28 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
+// Keep server alive by pinging itself every 5 minutes
+function keepAlive() {
+  setInterval(async () => {
+    try {
+      const port = process.env.PORT || 3000;
+      const url = `http://localhost:${port}/`;
+      await axios.get(url);
+      console.log('Keep-alive ping sent');
+    } catch (error) {
+      console.log('Keep-alive ping failed:', error.message);
+    }
+  }, 10 * 60 * 1000); // 5 minutes
+}
+
+// Start keep-alive function
+keepAlive();
+
+// Root endpoint
+app.get('/', (_req, res) => {
+  res.json({ message: 'Server is running', timestamp: new Date().toISOString() });
+});
+
 
 app.get('/group/fetch/:group/:uuid/:code', cache('5 minutes'), express.json(), async (req, res) => {
   const groupName = req.params.group;
