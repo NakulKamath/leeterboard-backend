@@ -363,7 +363,10 @@ app.post('/user/add', express.json(), async (req, res) => {
 
 app.post('/user/remove', express.json(), async (req, res) => {
   const { uuid, groupName } = req.body;
-  let username = req.body.username?.slice(5);
+  let username = req.body.username;
+  if (username && username.startsWith('anon-')) {
+    username = username.slice(5);
+  }
   if (!groupName || !uuid && !username) {
     return res.json({
       success: false,
