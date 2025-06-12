@@ -157,7 +157,7 @@ app.get('/group/fetch/:group/:uuid/:code', express.json(), async (req, res) => {
           return {
             username: username,
             questionsSolved: null,
-            error: 'User not found'
+            error: 'User not found on LeetCode'
           };
         }
         
