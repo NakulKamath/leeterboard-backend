@@ -65,7 +65,7 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
-// Keep server alive by pinging itself every 5 minutes
+
 function keepAlive() {
   setInterval(async () => {
     try {
@@ -76,10 +76,9 @@ function keepAlive() {
     } catch (error) {
       console.log('Keep-alive ping failed:', error.message);
     }
-  }, 10 * 60 * 1000); // 5 minutes
+  }, 10 * 60 * 1000);
 }
 
-// Start keep-alive function
 keepAlive();
 
 // Root endpoint
@@ -232,7 +231,7 @@ app.post('/user/add-anon', express.json(), async (req, res) => {
 
     const userData = await queryLeetCodeAPI(userStatusQuery, { username : username.slice(5) });
 
-    if (userData.errors) {
+    if (userData === undefined || userData.errors) {
       return res.json({
         success: false,
         message: 'User not found on LeetCode',
