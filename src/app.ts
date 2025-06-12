@@ -76,7 +76,7 @@ function keepAlive() {
     } catch (error) {
       console.log('Keep-alive ping failed:', error.message);
     }
-  }, 10 * 60 * 1000);
+  }, 5 * 60 * 1000);
 }
 
 keepAlive();
