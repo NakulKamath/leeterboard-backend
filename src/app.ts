@@ -153,7 +153,7 @@ app.get('/group/fetch/:group/:uuid/:code', express.json(), async (req, res) => {
       try {
         const userData = await queryLeetCodeAPI(userSubmissionsQuery, { username });
         
-        if (userData.errors) {
+        if (userData === undefined || userData.errors) {
           return {
             username: username,
             questionsSolved: null,
