@@ -1,4 +1,4 @@
-import express, { NextFunction, Response } from 'express';
+import express, {Response, NextFunction} from 'express';
 import cors from 'cors';
 import axios from 'axios';
 import rateLimit from 'express-rate-limit';
@@ -26,7 +26,11 @@ app.use(limiter);
 app.use(cors());
 app.use((req: express.Request, _res: Response, next: NextFunction) => {
   const origin = req.get('Origin');
-  if (origin && !origin.includes('leeterboard.xyz')) {
+  if (
+    origin &&
+    !origin.includes('leeterboard.xyz') &&
+    !origin.includes('leeterboard.nakulkamath.tech')
+  ) {
     return _res.status(403).json({ error: 'Access denied' });
   }
 
