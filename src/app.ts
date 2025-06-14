@@ -22,7 +22,9 @@ const limiter = rateLimit({
 });
 
 app.use(limiter);
-
+app.listen(3000, '127.0.0.1', () => {
+  console.log('Server running on http://127.0.0.1:3000');
+});
 app.use(cors());
 app.use((req: express.Request, _res: Response, next: NextFunction) => {
   const origin = req.get('Origin');
