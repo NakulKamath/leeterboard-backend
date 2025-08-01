@@ -48,7 +48,6 @@ async function queryLeetCodeAPI(query: string, variables: any) {
     if (error.response) {
       throw new Error(`Error from LeetCode API: ${error.response.data}`);
     } else if (error.request) {
-      throw new Error('No response received from LeetCode API');
       throw new Error(`Error in setting up the request: ${error.message}`);
     }
   }
@@ -472,7 +471,7 @@ app.post('/group/create', express.json(), async (req, res) => {
   }
   try {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-preview-04-17" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
     const prompt = `Are the words/sentences "${groupName}" and "${groupSecret}" appropriate? Return "yes" if it is appropriate, otherwise return "no". Do not include any additional text or explanations.`;
 
     const response = await model.generateContent(prompt);
