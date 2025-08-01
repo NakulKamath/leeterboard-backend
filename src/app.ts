@@ -475,7 +475,6 @@ app.post('/group/create', express.json(), async (req, res) => {
     const prompt = `Are the words/sentences "${groupName}" and "${groupSecret}" appropriate? Return "yes" if it is appropriate, otherwise return "no". Do not include any additional text or explanations.`;
 
     const response = await model.generateContent(prompt);
-    console.log(response.response.text());
 
     const isAppropriate = response.response.text().trim().toLowerCase() === 'yes';
 
